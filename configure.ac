@@ -210,6 +210,10 @@ AC_SUBST([COMMON_SSH_INCLUDE], '-I$(top_srcdir)/src/common-ssh')
 AC_SUBST([LIBGUAC_CLIENT_KUBERNETES_LTLIB],   '$(top_builddir)/src/protocols/kubernetes/libguac-client-kubernetes.la')
 AC_SUBST([LIBGUAC_CLIENT_KUBERNETES_INCLUDE], '-I$(top_srcdir)/src/protocols/kubernetes')
 
+# KubeVirt support
+AC_SUBST([LIBGUAC_CLIENT_KUBEVIRT_LTLIB],   '$(top_builddir)/src/protocols/kubevirt/libguac-client-kubevirt.la')
+AC_SUBST([LIBGUAC_CLIENT_KUBEVIRT_INCLUDE], '-I$(top_srcdir)/src/protocols/kubevirt')
+
 # RDP support
 AC_SUBST([LIBGUAC_CLIENT_RDP_LTLIB],   '$(top_builddir)/src/protocols/rdp/libguac-client-rdp.la')
 AC_SUBST([LIBGUAC_CLIENT_RDP_INCLUDE], '-I$(top_srcdir)/src/protocols/rdp')
@@ -1396,6 +1400,21 @@ AM_CONDITIONAL([ENABLE_KUBERNETES], [test "x${enable_kubernetes}"  = "xyes" \
                                        -a "x${have_terminal}"      = "xyes"])
 
 #
+# KubeVirt
+#
+
+AC_ARG_ENABLE([kubevirt],
+              [AS_HELP_STRING([--disable-kubevirt],
+                              [do not build support for KubeVirt VNC console connections])],
+              [],
+              [enable_kubevirt=yes])
+
+AM_CONDITIONAL([ENABLE_KUBEVIRT], [test "x${enable_kubevirt}"      = "xyes" \
+                                     -a "x${have_libwebsockets}"   = "xyes" \
+                                     -a "x${have_ssl}"             = "xyes" \
+                                     -a "x${have_libvncserver}"    = "xyes"])
+
+#
 # guacd
 #
 
@@ -1460,6 +1479,7 @@ AC_CONFIG_FILES([Makefile
                  src/pulse/Makefile
                  src/protocols/kubernetes/Makefile
                  src/protocols/kubernetes/tests/Makefile
+                 src/protocols/kubevirt/Makefile
                  src/protocols/rdp/Makefile
                  src/protocols/rdp/tests/Makefile
                  src/protocols/ssh/Makefile
@@ -1472,6 +1492,7 @@ AC_OUTPUT
 #
 
 AM_COND_IF([ENABLE_KUBERNETES], [build_kubernetes=yes], [build_kubernetes=no])
+AM_COND_IF([ENABLE_KUBEVIRT],   [build_kubevirt=yes],   [build_kubevirt=no])
 AM_COND_IF([ENABLE_RDP],        [build_rdp=yes],        [build_rdp=no])
 AM_COND_IF([ENABLE_SSH],        [build_ssh=yes],        [build_ssh=no])
 AM_COND_IF([ENABLE_TELNET],     [build_telnet=yes],     [build_telnet=no])
@@ -1534,6 +1555,7 @@ $PACKAGE_NAME version $PACKAGE_VERSION
    Protocol support:
 
       Kubernetes .... ${build_kubernetes}
+      KubeVirt ...... ${build_kubevirt}
       RDP ........... ${build_rdp}
       SSH ........... ${build_ssh}
       Telnet ........ ${build_telnet}
