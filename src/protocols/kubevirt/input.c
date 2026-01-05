@@ -23,6 +23,7 @@
 #include "kubevirt.h"
 
 #include <guacamole/client.h>
+#include <guacamole/display.h>
 #include <guacamole/recording.h>
 #include <guacamole/user.h>
 
@@ -35,24 +36,18 @@ int guac_kubevirt_user_mouse_handler(guac_user* user, int x, int y, int mask) {
     guac_kubevirt_client* kubevirt_client =
         (guac_kubevirt_client*) client->data;
 
+    /* Store current mouse location/state for render thread */
+    if (kubevirt_client->render_thread != NULL)
+        guac_display_render_thread_notify_user_moved_mouse(
+                kubevirt_client->render_thread, user, x, y, mask);
+
     /* Record mouse event if recording */
     if (kubevirt_client->recording != NULL)
         guac_recording_report_mouse(kubevirt_client->recording, x, y, mask);
 
-    /* Skip if VNC client is not initialized */
-    if (kubevirt_client->rfb_client == NULL)
-        return 0;
-
-    /* Convert Guacamole mouse button mask to VNC button mask */
-    int vnc_mask = 0;
-    if (mask & 0x01) vnc_mask |= 0x01;  /* Left button */
-    if (mask & 0x02) vnc_mask |= 0x04;  /* Middle button */
-    if (mask & 0x04) vnc_mask |= 0x02;  /* Right button */
-    if (mask & 0x08) vnc_mask |= 0x08;  /* Scroll up */
-    if (mask & 0x10) vnc_mask |= 0x10;  /* Scroll down */
-
-    /* Send mouse event using libvncclient */
-    SendPointerEvent(kubevirt_client->rfb_client, x, y, vnc_mask);
+    /* Send mouse event using libvncclient (button mask is compatible with VNC) */
+    if (kubevirt_client->rfb_client != NULL)
+        SendPointerEvent(kubevirt_client->rfb_client, x, y, mask);
 
     return 0;
 }
