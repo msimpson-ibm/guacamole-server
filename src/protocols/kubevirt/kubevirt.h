@@ -46,12 +46,12 @@
 /**
  * The maximum amount of time to wait for a libwebsockets event, in milliseconds.
  */
-#define GUAC_KUBEVIRT_SERVICE_INTERVAL 1000
+#define GUAC_KUBEVIRT_SERVICE_INTERVAL 50
 
 /**
  * Buffer size for VNC protocol messages.
  */
-#define GUAC_KUBEVIRT_VNC_BUFFER_SIZE 8192
+#define GUAC_KUBEVIRT_VNC_BUFFER_SIZE 16384
 
 /**
  * KubeVirt-specific client data.

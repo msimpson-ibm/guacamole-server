@@ -35,6 +35,7 @@
 #include <openssl/ssl.h>
 #include <rfb/rfbproto.h>
 #include <errno.h>
+#include <netinet/tcp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -630,7 +631,7 @@ static void* guac_kubevirt_socket_to_ws_thread(void* data) {
     guac_kubevirt_client* kubevirt_client =
         (guac_kubevirt_client*) client->data;
 
-    unsigned char buffer[LWS_PRE + 4096];
+    unsigned char buffer[LWS_PRE + 16384];
 
     guac_client_log(client, GUAC_LOG_DEBUG,
             "Socket to WebSocket forwarding thread started");
@@ -639,7 +640,7 @@ static void* guac_kubevirt_socket_to_ws_thread(void* data) {
 
         /* Read from socketpair (data from libvncclient) */
         ssize_t bytes_read = read(kubevirt_client->vnc_socket_pair[1],
-                buffer + LWS_PRE, 4096);
+                buffer + LWS_PRE, 16384);
 
         if (bytes_read < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -698,6 +699,19 @@ void* guac_kubevirt_client_thread(void* data) {
         guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
                 "Failed to create socket pair for VNC bridge");
         return NULL;
+    }
+
+    /* Set TCP_NODELAY on socketpair to reduce latency */
+    int nodelay = 1;
+    if (setsockopt(kubevirt_client->vnc_socket_pair[0], IPPROTO_TCP, TCP_NODELAY,
+                   &nodelay, sizeof(nodelay)) < 0) {
+        guac_client_log(client, GUAC_LOG_WARNING,
+                "Failed to set TCP_NODELAY on socketpair[0]: %s", strerror(errno));
+    }
+    if (setsockopt(kubevirt_client->vnc_socket_pair[1], IPPROTO_TCP, TCP_NODELAY,
+                   &nodelay, sizeof(nodelay)) < 0) {
+        guac_client_log(client, GUAC_LOG_WARNING,
+                "Failed to set TCP_NODELAY on socketpair[1]: %s", strerror(errno));
     }
 
     kubevirt_client->stop_threads = 0;
