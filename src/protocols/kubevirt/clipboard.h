@@ -54,4 +54,4 @@ int guac_kubevirt_clipboard_end_handler(guac_user* user, guac_stream* stream);
 void guac_kubevirt_clipboard_send(guac_client* client,
         const char* data, int length);
 
-#endif
+#endif /* GUAC_KUBEVIRT_CLIPBOARD_H */

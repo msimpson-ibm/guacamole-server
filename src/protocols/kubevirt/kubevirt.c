@@ -20,7 +20,9 @@
 #include "config.h"
 
 #include "clipboard.h"
+#include "display.h"
 #include "kubevirt.h"
+#include "log.h"
 #include "settings.h"
 #include "ssl.h"
 
@@ -35,7 +37,6 @@
 #include <openssl/ssl.h>
 #include <rfb/rfbproto.h>
 #include <errno.h>
-#include <netinet/tcp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -180,204 +181,6 @@ static struct lws_protocols protocols[] = {
     { NULL, NULL, 0, 0, 0, NULL, 0 }
 };
 
-/**
- * Callback invoked by libvncclient when framebuffer size changes.
- */
-static rfbBool guac_kubevirt_resize_framebuffer(rfbClient* rfb_client) {
-
-    guac_client* client = rfbClientGetClientData(rfb_client, NULL);
-    guac_kubevirt_client* kubevirt_client =
-        (guac_kubevirt_client*) client->data;
-
-    guac_client_log(client, GUAC_LOG_INFO,
-            "VNC framebuffer resized to %dx%d",
-            rfb_client->width, rfb_client->height);
-
-    /* Update display size */
-    kubevirt_client->width = rfb_client->width;
-    kubevirt_client->height = rfb_client->height;
-
-    /* Create display if it doesn't exist yet */
-    if (kubevirt_client->display == NULL) {
-        kubevirt_client->display = guac_display_alloc(client);
-    }
-
-    /* Ensure the display layer is the correct size */
-    guac_display_layer* default_layer =
-        guac_display_default_layer(kubevirt_client->display);
-    guac_display_layer_resize(default_layer,
-            rfb_client->width, rfb_client->height);
-
-    /* Start render thread if not already started */
-    if (kubevirt_client->render_thread == NULL) {
-        kubevirt_client->render_thread =
-            guac_display_render_thread_create(kubevirt_client->display);
-        guac_client_log(client, GUAC_LOG_INFO,
-                "Render thread started for display updates");
-
-        /* Sync display with already-connected users
-         * This sends the current display state (size info) to prevent handshake timeout
-         * join_pending_handler will handle users that join later */
-        if (client->socket != NULL) {
-            guac_display_dup(kubevirt_client->display, client->socket);
-            guac_socket_flush(client->socket);
-        }
-    }
-
-    /* Allocate framebuffer */
-    rfb_client->frameBuffer = malloc(rfb_client->width * rfb_client->height * 4);
-    if (!rfb_client->frameBuffer) {
-        guac_client_log(client, GUAC_LOG_ERROR,
-                "Failed to allocate framebuffer");
-        return FALSE;
-    }
-
-    guac_client_log(client, GUAC_LOG_INFO,
-            "Allocated framebuffer at %p, size=%d bytes",
-            rfb_client->frameBuffer,
-            rfb_client->width * rfb_client->height * 4);
-
-    return TRUE;
-}
-
-/**
- * Sets the pixel format to request from the VNC server. Note that the VNC
- * server is not required to honor this request.
- *
- * @param rfb_client
- *     The rfbClient associated with the VNC connection.
- *
- * @param color_depth
- *     The desired color depth in bits per pixel. Valid values are 8, 16, 24, and 32.
- */
-static void guac_kubevirt_set_pixel_format(rfbClient* rfb_client, int color_depth) {
-    rfb_client->format.trueColour = 1;
-    rfb_client->format.bigEndian = 0;
-
-    switch(color_depth) {
-        case 8:
-            rfb_client->format.depth        = 8;
-            rfb_client->format.bitsPerPixel = 8;
-            rfb_client->format.blueShift    = 6;
-            rfb_client->format.redShift     = 0;
-            rfb_client->format.greenShift   = 3;
-            rfb_client->format.blueMax      = 3;
-            rfb_client->format.redMax       = 7;
-            rfb_client->format.greenMax     = 7;
-            break;
-
-        case 16:
-            rfb_client->format.depth        = 16;
-            rfb_client->format.bitsPerPixel = 16;
-            rfb_client->format.blueShift    = 0;
-            rfb_client->format.redShift     = 11;
-            rfb_client->format.greenShift   = 5;
-            rfb_client->format.blueMax      = 0x1f;
-            rfb_client->format.redMax       = 0x1f;
-            rfb_client->format.greenMax     = 0x3f;
-            break;
-
-        case 24:
-        case 32:
-        default:
-            rfb_client->format.depth        = 24;
-            rfb_client->format.bitsPerPixel = 32;
-            rfb_client->format.blueShift    = 0;
-            rfb_client->format.redShift     = 16;
-            rfb_client->format.greenShift   = 8;
-            rfb_client->format.blueMax      = 0xff;
-            rfb_client->format.redMax       = 0xff;
-            rfb_client->format.greenMax     = 0xff;
-            break;
-    }
-}
-
-/**
- * Callback invoked by libvncclient when a framebuffer update is received.
- */
-static void guac_kubevirt_framebuffer_update(rfbClient* rfb_client,
-        int x, int y, int w, int h) {
-
-    guac_client* client = rfbClientGetClientData(rfb_client, NULL);
-    guac_kubevirt_client* kubevirt_client =
-        (guac_kubevirt_client*) client->data;
-    guac_kubevirt_settings* settings = kubevirt_client->settings;
-
-    /* Use the current context that was opened in the VNC client thread */
-    guac_display_layer_raw_context* context = kubevirt_client->current_context;
-    if (context == NULL) {
-        guac_client_log(client, GUAC_LOG_WARNING,
-                "Framebuffer update received but no context is open");
-        return;
-    }
-
-    unsigned int vnc_bpp = rfb_client->format.bitsPerPixel / 8;
-    size_t vnc_stride = vnc_bpp * rfb_client->width;
-
-    /* If pixel format matches guac_display (32-bit BGRA/BGRX), use direct copy */
-    if (vnc_bpp == 4 && !settings->swap_red_blue) {
-        /* Copy updated region from framebuffer to display layer */
-        for (int row = 0; row < h; row++) {
-            size_t dst_offset = (y + row) * context->stride + x * 4;
-            size_t src_offset = (y + row) * vnc_stride + x * 4;
-            memcpy(
-                context->buffer + dst_offset,
-                rfb_client->frameBuffer + src_offset,
-                w * 4
-            );
-        }
-    }
-    /* Otherwise, convert pixel format row by row */
-    else {
-        const unsigned char* vnc_row = rfb_client->frameBuffer + y * vnc_stride + x * vnc_bpp;
-        unsigned char* layer_row = context->buffer + y * context->stride + x * 4;
-
-        for (int dy = 0; dy < h; dy++) {
-            uint32_t* layer_pixel = (uint32_t*) layer_row;
-            const unsigned char* vnc_pixel = vnc_row;
-
-            for (int dx = 0; dx < w; dx++) {
-                /* Read VNC pixel value */
-                uint32_t v;
-                switch (vnc_bpp) {
-                    case 1:
-                        v = *((uint8_t*) vnc_pixel);
-                        break;
-                    case 2:
-                        v = *((uint16_t*) vnc_pixel);
-                        break;
-                    default:
-                        v = *((uint32_t*) vnc_pixel);
-                        break;
-                }
-
-                /* Extract RGB components */
-                uint8_t red   = (v >> rfb_client->format.redShift)   * 0x100 / (rfb_client->format.redMax   + 1);
-                uint8_t green = (v >> rfb_client->format.greenShift) * 0x100 / (rfb_client->format.greenMax + 1);
-                uint8_t blue  = (v >> rfb_client->format.blueShift)  * 0x100 / (rfb_client->format.blueMax  + 1);
-
-                /* Write BGRA pixel (swap red/blue if requested) */
-                if (settings->swap_red_blue)
-                    *(layer_pixel++) = 0xFF000000 | (blue << 16) | (green << 8) | red;
-                else
-                    *(layer_pixel++) = 0xFF000000 | (red << 16) | (green << 8) | blue;
-
-                vnc_pixel += vnc_bpp;
-            }
-
-            vnc_row += vnc_stride;
-            layer_row += context->stride;
-        }
-    }
-
-    /* Mark the updated region as dirty */
-    guac_rect update_rect;
-    guac_rect_init(&update_rect, x, y, w, h);
-    guac_rect_extend(&context->dirty, &update_rect);
-
-    /* Notify the render thread that the display has been modified */
-    guac_display_render_thread_notify_modified(kubevirt_client->render_thread);
-}
 
 /**
  * Initializes libvncclient with the socketpair.
@@ -692,6 +495,10 @@ void* guac_kubevirt_client_thread(void* data) {
 
     current_client = client;
 
+    /* Set up libvncclient logging */
+    rfbClientLog = guac_kubevirt_client_log_info;
+    rfbClientErr = guac_kubevirt_client_log_error;
+
     /* Initialize socketpair for bridging WebSocket to libvncclient
      * vnc_socket_pair[0] = libvncclient end
      * vnc_socket_pair[1] = WebSocket forwarding end */
@@ -699,19 +506,6 @@ void* guac_kubevirt_client_thread(void* data) {
         guac_client_abort(client, GUAC_PROTOCOL_STATUS_SERVER_ERROR,
                 "Failed to create socket pair for VNC bridge");
         return NULL;
-    }
-
-    /* Set TCP_NODELAY on socketpair to reduce latency */
-    int nodelay = 1;
-    if (setsockopt(kubevirt_client->vnc_socket_pair[0], IPPROTO_TCP, TCP_NODELAY,
-                   &nodelay, sizeof(nodelay)) < 0) {
-        guac_client_log(client, GUAC_LOG_WARNING,
-                "Failed to set TCP_NODELAY on socketpair[0]: %s", strerror(errno));
-    }
-    if (setsockopt(kubevirt_client->vnc_socket_pair[1], IPPROTO_TCP, TCP_NODELAY,
-                   &nodelay, sizeof(nodelay)) < 0) {
-        guac_client_log(client, GUAC_LOG_WARNING,
-                "Failed to set TCP_NODELAY on socketpair[1]: %s", strerror(errno));
     }
 
     kubevirt_client->stop_threads = 0;

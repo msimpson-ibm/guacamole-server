@@ -17,19 +17,36 @@
  * under the License.
  */
 
-#ifndef GUAC_KUBEVIRT_INPUT_H
-#define GUAC_KUBEVIRT_INPUT_H
+#ifndef GUAC_KUBEVIRT_LOG_H
+#define GUAC_KUBEVIRT_LOG_H
 
-#include <guacamole/user.h>
-
-/**
- * Handler for mouse events.
- */
-guac_user_mouse_handler guac_kubevirt_user_mouse_handler;
+#include <stdarg.h>
 
 /**
- * Handler for key events.
+ * Callback invoked by libVNCServer when an informational message needs to be
+ * logged.
+ *
+ * @param format
+ *     A printf-style format string to log.
+ *
+ * @param ...
+ *     The values to use when filling the conversion specifiers within the
+ *     format string.
  */
-guac_user_key_handler guac_kubevirt_user_key_handler;
+void guac_kubevirt_client_log_info(const char* format, ...);
 
-#endif /* GUAC_KUBEVIRT_INPUT_H */
+/**
+ * Callback invoked by libVNCServer when an error message needs to be logged.
+ *
+ * @param format
+ *     A printf-style format string to log.
+ *
+ * @param ...
+ *     The values to use when filling the conversion specifiers within the
+ *     format string.
+ */
+void guac_kubevirt_client_log_error(const char* format, ...);
+
+#endif /* GUAC_KUBEVIRT_LOG_H */
+
+// Made with Bob

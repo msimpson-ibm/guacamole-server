@@ -38,4 +38,4 @@
  */
 void guac_kubevirt_init_ssl(guac_client* client, SSL_CTX* context);
 
-#endif
+#endif /* GUAC_KUBEVIRT_SSL_H */

@@ -32,4 +32,4 @@ guac_user_join_handler guac_kubevirt_user_join_handler;
  */
 guac_user_leave_handler guac_kubevirt_user_leave_handler;
 
-#endif
+#endif /* GUAC_KUBEVIRT_USER_H */

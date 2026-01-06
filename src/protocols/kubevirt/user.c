@@ -19,12 +19,14 @@
 
 #include "config.h"
 
+#include "argv.h"
 #include "clipboard.h"
 #include "input.h"
 #include "kubevirt.h"
 #include "settings.h"
 #include "user.h"
 
+#include <guacamole/argv.h>
 #include <guacamole/client.h>
 #include <guacamole/recording.h>
 #include <guacamole/socket.h>
@@ -85,9 +87,35 @@ int guac_kubevirt_user_join_handler(guac_user* user, int argc, char** argv) {
     if (!settings->disable_paste)
         user->clipboard_handler = guac_kubevirt_clipboard_receive_handler;
 
+    /**
+     * Update connection parameters if we own the connection.
+     *
+     * Note that the argv handler is called *regardless* of whether
+     * or not the connection is read-only, as this allows authentication
+     * to be prompted and processed even if the owner cannot send
+     * input to the remote session. In the future, if other argv handling
+     * is added to the KubeVirt protocol, checks may need to be done within
+     * the argv handler to verify that read-only connections remain
+     * read-only.
+     *
+     * Also, this is only handled for the owner - if the argv handler
+     * is expanded to include non-owner users in the future, special
+     * care will need to be taken to make sure that the arguments
+     * processed by the handler do not have unintended security
+     * implications for non-owner users.
+     */
+    if (user->owner)
+        user->argv_handler = guac_argv_handler;
+
     return 0;
 }
 
 int guac_kubevirt_user_leave_handler(guac_user* user) {
+
+    guac_kubevirt_client* kubevirt_client = (guac_kubevirt_client*) user->client->data;
+
+    if (kubevirt_client->display)
+        guac_display_notify_user_left(kubevirt_client->display, user);
+
     return 0;
 }

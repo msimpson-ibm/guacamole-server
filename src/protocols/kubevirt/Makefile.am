@@ -29,19 +29,25 @@ ACLOCAL_AMFLAGS = -I m4
 lib_LTLIBRARIES = libguac-client-kubevirt.la
 
 libguac_client_kubevirt_la_SOURCES = \
+    argv.c                           \
     client.c                         \
     clipboard.c                      \
+    display.c                        \
     input.c                          \
     kubevirt.c                       \
+    log.c                            \
     settings.c                       \
     ssl.c                            \
     user.c
 
 noinst_HEADERS =      \
+    argv.h            \
     client.h          \
     clipboard.h       \
+    display.h         \
     input.h           \
     kubevirt.h        \
+    log.h             \
     settings.h        \
     ssl.h             \
     user.h

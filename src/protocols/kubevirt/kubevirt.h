@@ -17,8 +17,8 @@
  * under the License.
  */
 
-#ifndef GUAC_KUBEVIRT_KUBEVIRT_H
-#define GUAC_KUBEVIRT_KUBEVIRT_H
+#ifndef GUAC_KUBEVIRT_H
+#define GUAC_KUBEVIRT_H
 
 #include "common/clipboard.h"
 #include "settings.h"
@@ -223,4 +223,4 @@ typedef struct guac_kubevirt_client {
  */
 void* guac_kubevirt_client_thread(void* data);
 
-#endif
+#endif /* GUAC_KUBEVIRT_H */

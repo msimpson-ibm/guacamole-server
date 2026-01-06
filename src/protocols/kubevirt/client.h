@@ -23,8 +23,23 @@
 #include <guacamole/client.h>
 
 /**
- * Free handler which frees all data associated with the guac_client.
+ * The amount of time to wait for new messages from the WebSocket before
+ * moving on to internal matters, in milliseconds. This value must be kept
+ * reasonably small such that a slow connection will not prevent external
+ * events from being handled (such as the stop signal from guac_client_stop()),
+ * but large enough that the message handling loop does not eat up CPU
+ * spinning.
+ */
+#define GUAC_KUBEVIRT_MESSAGE_CHECK_INTERVAL 1000
+
+/**
+ * The number of milliseconds to wait between connection attempts.
+ */
+#define GUAC_KUBEVIRT_CONNECT_INTERVAL 1000
+
+/**
+ * Handler which frees all data associated with the guac_client.
  */
 guac_client_free_handler guac_kubevirt_client_free_handler;
 
-#endif
+#endif /* GUAC_KUBEVIRT_CLIENT_H */

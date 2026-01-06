@@ -17,8 +17,8 @@
  * under the License.
  */
 
-#ifndef __GUAC_KUBEVIRT_SETTINGS_H
-#define __GUAC_KUBEVIRT_SETTINGS_H
+#ifndef GUAC_KUBEVIRT_SETTINGS_H
+#define GUAC_KUBEVIRT_SETTINGS_H
 
 #include <guacamole/user.h>
 #include <stdbool.h>
@@ -199,4 +199,4 @@ void guac_kubevirt_settings_free(guac_kubevirt_settings* settings);
  */
 extern const char* GUAC_KUBEVIRT_CLIENT_ARGS[];
 
-#endif
+#endif /* GUAC_KUBEVIRT_SETTINGS_H */

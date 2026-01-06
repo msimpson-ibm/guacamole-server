@@ -17,19 +17,42 @@
  * under the License.
  */
 
-#ifndef GUAC_KUBEVIRT_INPUT_H
-#define GUAC_KUBEVIRT_INPUT_H
+#include "config.h"
 
-#include <guacamole/user.h>
+#include "log.h"
 
-/**
- * Handler for mouse events.
- */
-guac_user_mouse_handler guac_kubevirt_user_mouse_handler;
+#include <stdarg.h>
+#include <stdio.h>
+#include <syslog.h>
 
-/**
- * Handler for key events.
- */
-guac_user_key_handler guac_kubevirt_user_key_handler;
+void guac_kubevirt_client_log_info(const char* format, ...) {
 
-#endif /* GUAC_KUBEVIRT_INPUT_H */
+    char message[2048];
+
+    /* Copy log message into buffer */
+    va_list args;
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+
+    /* Log to syslog */
+    syslog(LOG_INFO, "%s", message);
+
+}
+
+void guac_kubevirt_client_log_error(const char* format, ...) {
+
+    char message[2048];
+
+    /* Copy log message into buffer */
+    va_list args;
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+
+    /* Log to syslog */
+    syslog(LOG_ERR, "%s", message);
+
+}
+
+// Made with Bob

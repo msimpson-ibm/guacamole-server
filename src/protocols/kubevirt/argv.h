@@ -17,19 +17,30 @@
  * under the License.
  */
 
-#ifndef GUAC_KUBEVIRT_INPUT_H
-#define GUAC_KUBEVIRT_INPUT_H
+#ifndef GUAC_KUBEVIRT_ARGV_H
+#define GUAC_KUBEVIRT_ARGV_H
 
+#include <guacamole/argv.h>
 #include <guacamole/user.h>
 
 /**
- * Handler for mouse events.
+ * Handles a received argument value from a Guacamole "argv" instruction,
+ * updating the given connection parameter.
+ *
+ * As noted in the user.c file, care should be taken when updating this
+ * callback to make sure that arguments are handled correctly when
+ * a connection is marked as read-only, and to make sure that any
+ * usage of this callback for non-owner users of a connection does
+ * not have unintended security implications.
  */
-guac_user_mouse_handler guac_kubevirt_user_mouse_handler;
+guac_argv_callback guac_kubevirt_argv_callback;
 
 /**
- * Handler for key events.
+ * The name of the parameter Guacamole will use to specify/update the token
+ * for the KubeVirt connection.
  */
-guac_user_key_handler guac_kubevirt_user_key_handler;
+#define GUAC_KUBEVIRT_ARGV_TOKEN "token"
 
-#endif /* GUAC_KUBEVIRT_INPUT_H */
+#endif /* GUAC_KUBEVIRT_ARGV_H */
+
+// Made with Bob
