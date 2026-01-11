@@ -45,13 +45,28 @@
 
 /**
  * The maximum amount of time to wait for a libwebsockets event, in milliseconds.
+ * Lower values increase responsiveness but use more CPU.
  */
-#define GUAC_KUBEVIRT_SERVICE_INTERVAL 50
+#define GUAC_KUBEVIRT_SERVICE_INTERVAL 10
+
+/**
+ * The timeout for waiting on VNC messages, in microseconds.
+ * Lower values increase refresh rate but use more CPU.
+ * Default: 50000 (50ms) for ~20 FPS equivalent responsiveness.
+ */
+#define GUAC_KUBEVIRT_FRAME_WAIT_TIMEOUT 50000
 
 /**
  * Buffer size for VNC protocol messages.
+ * Larger buffers reduce syscall overhead for high-bandwidth connections.
  */
-#define GUAC_KUBEVIRT_VNC_BUFFER_SIZE 16384
+#define GUAC_KUBEVIRT_VNC_BUFFER_SIZE 65536
+
+/**
+ * Buffer size for socket-to-WebSocket forwarding.
+ * Larger buffers improve throughput for high frame rate scenarios.
+ */
+#define GUAC_KUBEVIRT_SOCKET_BUFFER_SIZE 65536
 
 /**
  * KubeVirt-specific client data.

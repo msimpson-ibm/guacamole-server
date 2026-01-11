@@ -165,6 +165,13 @@ typedef struct guac_kubevirt_settings {
      */
     int retries;
 
+    /**
+     * The target frame duration in milliseconds. Lower values mean higher
+     * refresh rates but more CPU/bandwidth usage. 0 means unlimited (as fast
+     * as possible). Default is 0 for maximum responsiveness.
+     */
+    int frame_duration;
+
 } guac_kubevirt_settings;
 
 /**

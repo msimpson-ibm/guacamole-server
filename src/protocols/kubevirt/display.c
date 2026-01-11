@@ -106,18 +106,28 @@ void guac_kubevirt_framebuffer_update(rfbClient* rfb_client,
 
     unsigned int vnc_bpp = rfb_client->format.bitsPerPixel / 8;
     size_t vnc_stride = vnc_bpp * rfb_client->width;
+    size_t row_bytes = w * 4;
 
     /* If pixel format matches guac_display (32-bit BGRA/BGRX), use direct copy */
     if (vnc_bpp == 4 && !settings->swap_red_blue) {
-        /* Copy updated region from framebuffer to display layer */
-        for (int row = 0; row < h; row++) {
-            size_t dst_offset = (y + row) * context->stride + x * 4;
-            size_t src_offset = (y + row) * vnc_stride + x * 4;
+        /* Optimized path: if strides match and region spans full width, use single memcpy */
+        if (x == 0 && w == rfb_client->width && context->stride == (int)vnc_stride) {
+            /* Single bulk copy for full-width updates */
             memcpy(
-                context->buffer + dst_offset,
-                rfb_client->frameBuffer + src_offset,
-                w * 4
+                context->buffer + y * context->stride,
+                rfb_client->frameBuffer + y * vnc_stride,
+                (size_t)h * row_bytes
             );
+        }
+        else {
+            /* Row-by-row copy for partial updates */
+            unsigned char* dst = context->buffer + y * context->stride + x * 4;
+            const unsigned char* src = rfb_client->frameBuffer + y * vnc_stride + x * 4;
+            for (int row = 0; row < h; row++) {
+                memcpy(dst, src, row_bytes);
+                dst += context->stride;
+                src += vnc_stride;
+            }
         }
     }
     /* Otherwise, convert pixel format row by row */

@@ -54,6 +54,7 @@ const char* GUAC_KUBEVIRT_CLIENT_ARGS[] = {
     "recording-include-keys",
     "recording-write-existing",
     "retries",
+    "frame-duration",
     NULL
 };
 
@@ -84,6 +85,7 @@ enum KUBEVIRT_ARGS_IDX {
     IDX_RECORDING_INCLUDE_KEYS,
     IDX_RECORDING_WRITE_EXISTING,
     IDX_RETRIES,
+    IDX_FRAME_DURATION,
     KUBEVIRT_ARGS_COUNT
 };
 
@@ -219,6 +221,11 @@ guac_kubevirt_settings* guac_kubevirt_parse_args(guac_user* user,
     settings->retries =
         guac_user_parse_args_int(user, GUAC_KUBEVIRT_CLIENT_ARGS, argv,
                 IDX_RETRIES, 5);
+
+    /* Frame duration defaults to 0 (unlimited/maximum refresh rate) */
+    settings->frame_duration =
+        guac_user_parse_args_int(user, GUAC_KUBEVIRT_CLIENT_ARGS, argv,
+                IDX_FRAME_DURATION, 0);
 
     return settings;
 }

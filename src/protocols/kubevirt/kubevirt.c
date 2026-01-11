@@ -337,6 +337,7 @@ static void* guac_kubevirt_vnc_client_thread(void* data) {
     guac_client* client = (guac_client*) data;
     guac_kubevirt_client* kubevirt_client =
         (guac_kubevirt_client*) client->data;
+    guac_kubevirt_settings* settings = kubevirt_client->settings;
 
     guac_client_log(client, GUAC_LOG_DEBUG,
             "VNC client thread started");
@@ -371,12 +372,23 @@ static void* guac_kubevirt_vnc_client_thread(void* data) {
     guac_display_layer* default_layer =
         guac_display_default_layer(kubevirt_client->display);
 
+    /* Calculate frame wait timeout based on settings */
+    int frame_wait_timeout = GUAC_KUBEVIRT_FRAME_WAIT_TIMEOUT;
+    if (settings->frame_duration > 0) {
+        /* Convert milliseconds to microseconds */
+        frame_wait_timeout = settings->frame_duration * 1000;
+    }
+
+    guac_client_log(client, GUAC_LOG_DEBUG,
+            "VNC frame wait timeout: %d microseconds (%d ms)",
+            frame_wait_timeout, frame_wait_timeout / 1000);
+
     /* Main VNC event loop */
     while (!kubevirt_client->stop_threads &&
            client->state == GUAC_CLIENT_RUNNING) {
 
-        /* Wait for and handle VNC messages */
-        int result = WaitForMessage(kubevirt_client->rfb_client, 500000); /* 500ms timeout */
+        /* Wait for and handle VNC messages with optimized timeout */
+        int result = WaitForMessage(kubevirt_client->rfb_client, frame_wait_timeout);
 
         if (result < 0) {
             guac_client_log(client, GUAC_LOG_ERROR,
@@ -402,13 +414,15 @@ static void* guac_kubevirt_vnc_client_thread(void* data) {
             /* Close the raw context - commits changes for render thread */
             guac_display_layer_close_raw(default_layer, context);
             kubevirt_client->current_context = NULL;
+        }
 
-            /* Request next framebuffer update (incremental) after processing messages */
-            if (!SendIncrementalFramebufferUpdateRequest(kubevirt_client->rfb_client)) {
-                guac_client_log(client, GUAC_LOG_DEBUG,
-                        "Failed to send incremental framebuffer update request");
-                /* Don't break - this might be a transient error */
-            }
+        /* Always request next framebuffer update to maintain continuous refresh.
+         * This is sent after processing messages or when timeout expires, ensuring
+         * the VNC server continuously pushes updates for maximum responsiveness. */
+        if (!SendIncrementalFramebufferUpdateRequest(kubevirt_client->rfb_client)) {
+            guac_client_log(client, GUAC_LOG_DEBUG,
+                    "Failed to send incremental framebuffer update request");
+            /* Don't break - this might be a transient error */
         }
     }
 
@@ -434,16 +448,17 @@ static void* guac_kubevirt_socket_to_ws_thread(void* data) {
     guac_kubevirt_client* kubevirt_client =
         (guac_kubevirt_client*) client->data;
 
-    unsigned char buffer[LWS_PRE + 16384];
+    unsigned char buffer[LWS_PRE + GUAC_KUBEVIRT_SOCKET_BUFFER_SIZE];
 
     guac_client_log(client, GUAC_LOG_DEBUG,
-            "Socket to WebSocket forwarding thread started");
+            "Socket to WebSocket forwarding thread started (buffer size: %d)",
+            GUAC_KUBEVIRT_SOCKET_BUFFER_SIZE);
 
     while (!kubevirt_client->stop_threads && client->state == GUAC_CLIENT_RUNNING) {
 
-        /* Read from socketpair (data from libvncclient) */
+        /* Read from socketpair (data from libvncclient) with optimized buffer */
         ssize_t bytes_read = read(kubevirt_client->vnc_socket_pair[1],
-                buffer + LWS_PRE, 16384);
+                buffer + LWS_PRE, GUAC_KUBEVIRT_SOCKET_BUFFER_SIZE);
 
         if (bytes_read < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -508,10 +523,22 @@ void* guac_kubevirt_client_thread(void* data) {
         return NULL;
     }
 
+    /* Increase socket buffer sizes for better throughput */
+    int socket_buffer_size = GUAC_KUBEVIRT_SOCKET_BUFFER_SIZE * 4;
+    setsockopt(kubevirt_client->vnc_socket_pair[0], SOL_SOCKET, SO_RCVBUF,
+            &socket_buffer_size, sizeof(socket_buffer_size));
+    setsockopt(kubevirt_client->vnc_socket_pair[0], SOL_SOCKET, SO_SNDBUF,
+            &socket_buffer_size, sizeof(socket_buffer_size));
+    setsockopt(kubevirt_client->vnc_socket_pair[1], SOL_SOCKET, SO_RCVBUF,
+            &socket_buffer_size, sizeof(socket_buffer_size));
+    setsockopt(kubevirt_client->vnc_socket_pair[1], SOL_SOCKET, SO_SNDBUF,
+            &socket_buffer_size, sizeof(socket_buffer_size));
+
     kubevirt_client->stop_threads = 0;
 
     guac_client_log(client, GUAC_LOG_DEBUG,
-            "Created socket pair: libvncclient fd=%d, ws fd=%d",
+            "Created socket pair with optimized buffers (%d bytes): libvncclient fd=%d, ws fd=%d",
+            socket_buffer_size,
             kubevirt_client->vnc_socket_pair[0],
             kubevirt_client->vnc_socket_pair[1]);
 
