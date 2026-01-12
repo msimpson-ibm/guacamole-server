@@ -39,21 +39,34 @@ int guac_kubevirt_user_join_handler(guac_user* user, int argc, char** argv) {
 
     guac_kubevirt_client* kubevirt_client = (guac_kubevirt_client*) user->client->data;
 
-    /* Parse arguments into client */
-    guac_kubevirt_settings* settings = kubevirt_client->settings =
-            guac_kubevirt_parse_args(user, argc, (const char**) argv);
+    /* Parse provided arguments */
+    guac_kubevirt_settings* settings = guac_kubevirt_parse_args(user,
+            argc, (const char**) argv);
 
-    /* Fail if required settings are missing */
-    if (settings->hostname == NULL || settings->namespace == NULL ||
-        settings->vm_name == NULL || settings->token == NULL) {
-        guac_user_log(user, GUAC_LOG_ERROR, "Required connection parameters "
-                "are missing. Please provide hostname, namespace, vm-name, "
-                "and token.");
+    /* Fail if settings cannot be parsed */
+    if (settings == NULL) {
+        guac_user_log(user, GUAC_LOG_INFO,
+                "Badly formatted client arguments.");
         return 1;
     }
 
-    /* Store owner's settings for shared use */
+    /* Store settings at user level */
+    user->data = settings;
+
+    /* Connect via KubeVirt if owner */
     if (user->owner) {
+
+        /* Fail if required settings are missing */
+        if (settings->hostname == NULL || settings->namespace == NULL ||
+            settings->vm_name == NULL || settings->token == NULL) {
+            guac_user_log(user, GUAC_LOG_ERROR, "Required connection parameters "
+                    "are missing. Please provide hostname, namespace, vm-name, "
+                    "and token.");
+            return 1;
+        }
+
+        /* Store owner's settings at client level */
+        kubevirt_client->settings = settings;
 
         /* Set up recording if requested */
         if (settings->recording_path != NULL) {
@@ -116,6 +129,12 @@ int guac_kubevirt_user_leave_handler(guac_user* user) {
 
     if (kubevirt_client->display)
         guac_display_notify_user_left(kubevirt_client->display, user);
+
+    /* Free settings if not owner (owner settings will be freed with client) */
+    if (!user->owner) {
+        guac_kubevirt_settings* settings = (guac_kubevirt_settings*) user->data;
+        guac_kubevirt_settings_free(settings);
+    }
 
     return 0;
 }
