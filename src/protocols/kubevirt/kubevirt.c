@@ -299,6 +299,19 @@ static int guac_kubevirt_init_rfb_client(guac_client* client) {
             guac_display_set_cursor(kubevirt_client->display, GUAC_DISPLAY_CURSOR_POINTER);
     }
 
+    /* Initialize keyboard with the configured layout */
+    kubevirt_client->keyboard = guac_kubevirt_keyboard_alloc(client,
+            kubevirt_client->rfb_client, settings->server_layout);
+    if (kubevirt_client->keyboard == NULL) {
+        guac_client_log(client, GUAC_LOG_WARNING,
+                "Failed to allocate keyboard, using direct key handling");
+    }
+    else {
+        guac_client_log(client, GUAC_LOG_INFO,
+                "Keyboard initialized with layout: %s",
+                settings->server_layout ? settings->server_layout->name : "en-us-qwerty");
+    }
+
     guac_client_log(client, GUAC_LOG_INFO,
             "Configured VNC: compress=%d, quality=%d, remote_cursor=%s",
             kubevirt_client->rfb_client->appData.compressLevel,
@@ -312,6 +325,32 @@ static int guac_kubevirt_init_rfb_client(guac_client* client) {
         rfbClientCleanup(kubevirt_client->rfb_client);
         kubevirt_client->rfb_client = NULL;
         return -1;
+    }
+
+    /* Manually send QEMU Extended Key Event pseudo-encoding
+     * This tells the VNC server we support QEMU Extended Key Events (message type 255)
+     * The encoding value is -258 (0xFFFFFEFE) according to QEMU VNC protocol extension
+     * We send this after SetFormatAndEncodings to add it to the supported encodings */
+    {
+        uint8_t msg[8];
+        msg[0] = rfbSetEncodings;  /* Message type: SetEncodings */
+        msg[1] = 0;  /* Padding */
+        
+        /* Number of encodings (16-bit, network byte order) */
+        uint16_t num_encodings = htons(1);
+        memcpy(&msg[2], &num_encodings, 2);
+        
+        /* QEMU Extended Key Event encoding: -258 (32-bit, network byte order) */
+        int32_t qemu_encoding = htonl(-258);
+        memcpy(&msg[4], &qemu_encoding, 4);
+        
+        if (WriteToRFBServer(kubevirt_client->rfb_client, (char*)msg, 8)) {
+            guac_client_log(client, GUAC_LOG_DEBUG,
+                    "Sent QEMU Extended Key Event encoding (-258) to VNC server");
+        } else {
+            guac_client_log(client, GUAC_LOG_WARNING,
+                    "Failed to send QEMU Extended Key Event encoding");
+        }
     }
 
     guac_client_log(client, GUAC_LOG_INFO,

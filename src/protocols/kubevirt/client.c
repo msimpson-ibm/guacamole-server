@@ -21,6 +21,7 @@
 
 #include "client.h"
 #include "common/clipboard.h"
+#include "keyboard.h"
 #include "kubevirt.h"
 #include "settings.h"
 #include "user.h"
@@ -107,6 +108,10 @@ int guac_kubevirt_client_free_handler(guac_client* client) {
     /* Free clipboard */
     if (kubevirt_client->clipboard != NULL)
         guac_common_clipboard_free(kubevirt_client->clipboard);
+
+    /* Free keyboard */
+    if (kubevirt_client->keyboard != NULL)
+        guac_kubevirt_keyboard_free(kubevirt_client->keyboard);
 
     /* Free display */
     if (kubevirt_client->display != NULL)

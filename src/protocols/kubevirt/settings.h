@@ -20,6 +20,8 @@
 #ifndef GUAC_KUBEVIRT_SETTINGS_H
 #define GUAC_KUBEVIRT_SETTINGS_H
 
+#include "keymap.h"
+
 #include <guacamole/user.h>
 #include <stdbool.h>
 
@@ -171,6 +173,13 @@ typedef struct guac_kubevirt_settings {
      * as possible). Default is 0 for maximum responsiveness.
      */
     int frame_duration;
+
+    /**
+     * The keymap chosen as the layout of the server. This keymap is used
+     * to translate X11 keysyms to the appropriate key events for the VNC
+     * server, taking into account the server's keyboard layout.
+     */
+    const guac_kubevirt_keymap* server_layout;
 
 } guac_kubevirt_settings;
 

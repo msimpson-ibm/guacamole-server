@@ -20,6 +20,7 @@
 #include "config.h"
 
 #include "input.h"
+#include "keyboard.h"
 #include "kubevirt.h"
 
 #include <guacamole/client.h>
@@ -63,12 +64,14 @@ int guac_kubevirt_user_key_handler(guac_user* user, int keysym, int pressed) {
         guac_recording_report_key(kubevirt_client->recording,
                 keysym, pressed);
 
-    /* Skip if VNC client is not initialized */
-    if (kubevirt_client->rfb_client == NULL)
-        return 0;
+    /* Send key event using keyboard module for proper layout handling */
+    if (kubevirt_client->keyboard != NULL)
+        return guac_kubevirt_keyboard_send_key(kubevirt_client->keyboard,
+                keysym, pressed);
 
-    /* Send key event using libvncclient */
-    SendKeyEvent(kubevirt_client->rfb_client, keysym, pressed);
+    /* Fallback: send directly if keyboard module not initialized */
+    if (kubevirt_client->rfb_client != NULL)
+        SendKeyEvent(kubevirt_client->rfb_client, keysym, pressed);
 
     return 0;
 }

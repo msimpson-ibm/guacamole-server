@@ -20,6 +20,7 @@
 #include "config.h"
 
 #include "settings.h"
+#include "keymap.h"
 
 #include <guacamole/mem.h>
 #include <guacamole/user.h>
@@ -46,6 +47,7 @@ const char* GUAC_KUBEVIRT_CLIENT_ARGS[] = {
     "clipboard-buffer-size",
     "disable-copy",
     "disable-paste",
+    "server-layout",
     "recording-path",
     "recording-name",
     "create-recording-path",
@@ -77,6 +79,7 @@ enum KUBEVIRT_ARGS_IDX {
     IDX_CLIPBOARD_BUFFER_SIZE,
     IDX_DISABLE_COPY,
     IDX_DISABLE_PASTE,
+    IDX_SERVER_LAYOUT,
     IDX_RECORDING_PATH,
     IDX_RECORDING_NAME,
     IDX_CREATE_RECORDING_PATH,
@@ -226,6 +229,16 @@ guac_kubevirt_settings* guac_kubevirt_parse_args(guac_user* user,
     settings->frame_duration =
         guac_user_parse_args_int(user, GUAC_KUBEVIRT_CLIENT_ARGS, argv,
                 IDX_FRAME_DURATION, 0);
+
+    /* Pick keymap based on argument */
+    settings->server_layout = NULL;
+    if (argv[IDX_SERVER_LAYOUT][0] != '\0')
+        settings->server_layout =
+            guac_kubevirt_keymap_find(argv[IDX_SERVER_LAYOUT]);
+
+    /* If no keymap requested, use default */
+    if (settings->server_layout == NULL)
+        settings->server_layout = guac_kubevirt_keymap_find(GUAC_KUBEVIRT_DEFAULT_KEYMAP);
 
     return settings;
 }

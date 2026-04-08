@@ -21,6 +21,7 @@
 #define GUAC_KUBEVIRT_H
 
 #include "common/clipboard.h"
+#include "keyboard.h"
 #include "settings.h"
 
 #include <guacamole/client.h>
@@ -104,6 +105,12 @@ typedef struct guac_kubevirt_client {
      * has not yet been started, this will be NULL.
      */
     guac_display_render_thread* render_thread;
+
+    /**
+     * The keyboard state for this session, used for handling international
+     * keyboard layouts.
+     */
+    guac_kubevirt_keyboard* keyboard;
 
     /**
      * Internal clipboard.

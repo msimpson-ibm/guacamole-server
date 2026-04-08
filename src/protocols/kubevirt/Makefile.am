@@ -34,8 +34,12 @@ libguac_client_kubevirt_la_SOURCES = \
     clipboard.c                      \
     display.c                        \
     input.c                          \
+    keyboard.c                       \
+    keymap.c                         \
+    keymap-data.c                    \
     kubevirt.c                       \
     log.c                            \
+    scancode.c                       \
     settings.c                       \
     ssl.c                            \
     user.c
@@ -46,8 +50,11 @@ noinst_HEADERS =      \
     clipboard.h       \
     display.h         \
     input.h           \
+    keyboard.h        \
+    keymap.h          \
     kubevirt.h        \
     log.h             \
+    scancode.h        \
     settings.h        \
     ssl.h             \
     user.h
